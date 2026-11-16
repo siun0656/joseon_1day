@@ -1652,8 +1652,8 @@ function drawMinimap(px, pz, face, target) {
   g.drawImage(MAPC, mx - srcR, mz - srcR, srcR * 2, srcR * 2, 0, 0, W, W);
   // NPC
   for (const e of ENT) { if (e.kind !== 'npc' || !e.obj.visible) continue; const dx = (e.pos.x - px) * sc + 150, dz = (e.pos.z - pz) * sc + 150; if (Math.hypot(dx - 150, dz - 150) > 140) continue; g.fillStyle = '#f2e6c8'; g.beginPath(); g.arc(dx, dz, 4, 0, 7); g.fill(); }
-  if (NAV.path && NAV.path.length > 1 && SETTINGS.guide !== false) { g.strokeStyle = 'rgba(255,205,90,.95)'; g.lineWidth = 5; g.setLineDash([10, 8]); g.beginPath(); NAV.path.forEach((q, i) => { const x = (q[0] - px) * sc + 150, y = (q[1] - pz) * sc + 150; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.setLineDash([]); }
-  if (target) { let dx = (target.x - px) * sc, dz = (target.z - pz) * sc; const L = Math.hypot(dx, dz); if (L > 128) { dx *= 128 / L; dz *= 128 / L; } g.save(); g.translate(150 + dx, 150 + dz); g.rotate(Math.PI / 4); g.fillStyle = '#f2c96b'; g.strokeStyle = '#3a2a0a'; g.lineWidth = 3; g.fillRect(-8, -8, 16, 16); g.strokeRect(-8, -8, 16, 16); g.restore(); }
+  if (SETTINGS.guide !== false) for (const PP of (NAV.paths && NAV.paths.length ? NAV.paths : [NAV.path])) { if (!PP || PP.length < 2) continue; g.strokeStyle = 'rgba(255,205,90,.95)'; g.lineWidth = 5; g.setLineDash([10, 8]); g.beginPath(); PP.forEach((q, i) => { const x = (q[0] - px) * sc + 150, y = (q[1] - pz) * sc + 150; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.setLineDash([]); }
+  for (const target of questTargets()) { let dx = (target.x - px) * sc, dz = (target.z - pz) * sc; const L = Math.hypot(dx, dz); if (L > 128) { dx *= 128 / L; dz *= 128 / L; } g.save(); g.translate(150 + dx, 150 + dz); g.rotate(Math.PI / 4); g.fillStyle = '#f2c96b'; g.strokeStyle = '#3a2a0a'; g.lineWidth = 3; g.fillRect(-8, -8, 16, 16); g.strokeRect(-8, -8, 16, 16); g.restore(); }
   g.save(); g.translate(150, 150); g.rotate(face); g.fillStyle = '#e0503f'; g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, -14); g.lineTo(10, 10); g.lineTo(0, 5); g.lineTo(-10, 10); g.closePath(); g.fill(); g.stroke(); g.restore();
   g.restore();
   g.fillStyle = 'rgba(255,240,210,.9)'; g.font = 'bold 22px serif'; g.textAlign = 'center'; g.fillText('北', 150, 26);
@@ -1663,7 +1663,7 @@ function openMap() {
   g.font = '15px "Gowun Batang",serif'; g.textAlign = 'center';
   for (const r of REGIONS) { const locked = r.lock && !(GATES[r.lock] && GATES[r.lock].open) && !(r.lock === 'hanyang' && S.step >= 38); const [a, b] = w2m(r.x, r.z); g.fillStyle = 'rgba(20,15,10,.7)'; const t = locked ? '??? (잠김)' : r.name; const w = g.measureText(t).width + 12; g.fillRect(a - w / 2, b - 12, w, 22); g.fillStyle = locked ? '#bbb' : '#f6e7c4'; g.fillText(t, a, b + 4); }
   const p = PLAYER.obj.position; const [pa, pb] = w2m(p.x, p.z); g.fillStyle = '#e0503f'; g.beginPath(); g.arc(pa, pb, 7, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke();
-  const t = questTarget(); if (t) { const [ta, tb] = w2m(t.x, t.z); g.save(); g.translate(ta, tb); g.rotate(Math.PI / 4); g.fillStyle = '#f2c96b'; g.fillRect(-7, -7, 14, 14); g.strokeStyle = '#3a2a0a'; g.strokeRect(-7, -7, 14, 14); g.restore(); }
+  for (const t of questTargets()) { const [ta, tb] = w2m(t.x, t.z); g.save(); g.translate(ta, tb); g.rotate(Math.PI / 4); g.fillStyle = '#f2c96b'; g.fillRect(-7, -7, 14, 14); g.strokeStyle = '#3a2a0a'; g.strokeRect(-7, -7, 14, 14); g.restore(); }
   modal('마을 지도', `<div style="text-align:center"><img src="${c.toDataURL()}" style="width:min(100%,560px);border:2px solid #b99a62;border-radius:4px"></div><div class="note" style="text-align:center">● 나 &nbsp; ◆ 현재 임무 &nbsp; · 임무를 마치면 잠긴 지역이 열려요.</div>`, [{ label: '닫기', val: 1 }], { seal: '圖' });
 }
 $('#minimap').onclick = () => !BUSY && openMap();
@@ -1945,6 +1945,10 @@ const CH_RANGE = {}; STEPS.forEach((s, i) => { if (!CH_RANGE[s.ch]) CH_RANGE[s.c
 const ENTBY = {};
 function nearestOf(list) { if (!list || !list.length) return null; const p = PLAYER.obj.position; let b = null, bd = 1e9; for (const m of list) { const d = Math.hypot(m.x - p.x, m.z - p.z); if (d < bd) { bd = d; b = m; } } return b; }
 function nearestPlot(pref) { const l = ['p1', 'p2', 'p3', 'p4', 'p5'].filter(k => !S.flags[pref + k]).map(k => FIELDS[k]); return nearestOf(l); }
+function questTargets() {
+  if (S.step === 21 && NPCS.naru && NPCS.san) return [NPCS.naru.pos, NPCS.san.pos];
+  const t = questTarget(); return t ? [t] : [];
+}
 function questTarget() {
   const st = STEPS[S.step]; if (!st || !st.tg) return null;
   if (typeof st.tg === 'string') { const n = NPCS[st.tg] || ENTBY[st.tg]; return n ? n.pos : null; }
@@ -2989,16 +2993,16 @@ function navFind(sx, sz, tx, tz) {
 
 /* 화살표 (인스턴싱) */
 const TRAIL_MAX = 14, TRAIL_GAP = 2.4, TRAIL_LEN = 24;
-let TRAIL = null, TRAIL_O = null, PILLAR = null;
+let TRAIL = null, TRAIL_O = null, PILLAR = null, PILLARS = [];
 function navMeshes() {
   const sh = new THREE.Shape(); sh.moveTo(-0.38, -0.28); sh.lineTo(0, 0.22); sh.lineTo(0.38, -0.28); sh.lineTo(0.38, -0.02); sh.lineTo(0, 0.46); sh.lineTo(-0.38, -0.02); sh.closePath();
   const geo = new THREE.ShapeGeometry(sh); geo.rotateX(-Math.PI / 2); geo.rotateY(Math.PI);
   const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xf5a00a).convertSRGBToLinear(), transparent: true, opacity: 0.7, depthWrite: false, fog: false });
-  TRAIL = new THREE.InstancedMesh(geo, mat, TRAIL_MAX); TRAIL.count = 0; TRAIL.frustumCulled = false; TRAIL.renderOrder = 6;
+  TRAIL = new THREE.InstancedMesh(geo, mat, TRAIL_MAX * 2); TRAIL.count = 0; TRAIL.frustumCulled = false; TRAIL.renderOrder = 6;
   scene.add(TRAIL);
   // 바닥과 구분되도록 어두운 테두리 화살표
   const og = geo.clone(); og.scale(1.2, 1, 1.2);
-  TRAIL_O = new THREE.InstancedMesh(og, new THREE.MeshBasicMaterial({ color: 0x3a2206, transparent: true, opacity: 0.25, depthWrite: false, fog: false }), TRAIL_MAX); TRAIL_O.count = 0; TRAIL_O.frustumCulled = false; TRAIL_O.renderOrder = 5;
+  TRAIL_O = new THREE.InstancedMesh(og, new THREE.MeshBasicMaterial({ color: 0x3a2206, transparent: true, opacity: 0.25, depthWrite: false, fog: false }), TRAIL_MAX * 2); TRAIL_O.count = 0; TRAIL_O.frustumCulled = false; TRAIL_O.renderOrder = 5;
   scene.add(TRAIL_O);
   const tex = canvasTex(16, 128, (g, w, h) => { const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, 'rgba(255,215,120,.95)'); gr.addColorStop(.25, 'rgba(255,200,90,.45)'); gr.addColorStop(1, 'rgba(255,200,90,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
   PILLAR = new THREE.Group();
@@ -3006,45 +3010,51 @@ function navMeshes() {
   cyl.position.y = 6; PILLAR.add(cyl);
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 32), new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide, fog: false }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.1; PILLAR.add(ring); PILLAR.ring = ring; PILLAR.cyl = cyl;
-  PILLAR.visible = false; scene.add(PILLAR);
+  PILLAR.visible = false; scene.add(PILLAR); PILLARS = [PILLAR];
+  { const P2 = new THREE.Group(); const c2 = cyl.clone(); c2.material = cyl.material.clone(); const r2 = ring.clone(); r2.material = ring.material.clone(); P2.add(c2); P2.add(r2); P2.cyl = c2; P2.ring = r2; P2.visible = false; scene.add(P2); PILLARS.push(P2); }
 }
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
 function navUpdate(dt, t) {
   if (!TRAIL) return;
   const on = SETTINGS.guide !== false && canControl() && !TEL.on && !CR.on;
-  const tg = on ? questTarget() : null;
-  if (!tg) { TRAIL.count = TRAIL_O.count = 0; PILLAR.visible = false; NAV.path = []; return; }
+  const tgs = on ? questTargets() : [];
+  const clearAll = () => { TRAIL.count = TRAIL_O.count = 0; PILLARS.forEach(p => p.visible = false); NAV.path = []; NAV.paths = []; };
+  if (!tgs.length) { clearAll(); return; }
   if (NAV.dirty || !NAV.grid) navBuild();
-  const p = PLAYER.obj.position, d = Math.hypot(tg.x - p.x, tg.z - p.z);
-  // 빛기둥
-  PILLAR.position.set(tg.x, (tg.y !== undefined ? Math.max(tg.y, groundY(tg.x, tg.z)) : groundY(tg.x, tg.z)), tg.z);
-  const pul = 0.5 + 0.5 * Math.sin(t * 3); PILLAR.ring.scale.setScalar(1 + pul * 0.2); PILLAR.ring.material.opacity = 0.35 + 0.25 * (1 - pul); PILLAR.cyl.material.opacity = clamp((d - 6) / 20, 0, 0.45); PILLAR.visible = d > 6;
-  if (d < 3) { TRAIL.count = TRAIL_O.count = 0; NAV.path = []; return; }
-  // 길 다시 찾기
+  const p = PLAYER.obj.position;
+  const key = tgs.map(g => Math.round(g.x) + ',' + Math.round(g.z)).join('|');
   NAV.t -= dt;
-  const key = Math.round(tg.x) + ',' + Math.round(tg.z);
   if (NAV.t <= 0 && (key !== NAV.tKey || Math.hypot(p.x - NAV.sx, p.z - NAV.sz) > 2.2)) {
     NAV.t = 0.35; NAV.tKey = key; NAV.sx = p.x; NAV.sz = p.z;
-    NAV.path = navFind(p.x, p.z, tg.x, tg.z) || [[p.x, p.z], [tg.x, tg.z]];
+    NAV.paths = tgs.map(g => navFind(p.x, p.z, g.x, g.z) || [[p.x, p.z], [g.x, g.z]]);
+    NAV.path = NAV.paths[0];
   }
-  const P = NAV.path; if (P.length < 2) { TRAIL.count = TRAIL_O.count = 0; return; }
-  // 현재 위치를 길의 시작점으로
-  P[0] = [p.x, p.z];
-  const segs = []; let total = 0;
-  for (let i = 0; i < P.length - 1; i++) { const L = Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]); if (L < 0.01) continue; segs.push([P[i][0], P[i][1], P[i + 1][0], P[i + 1][1], L, total]); total += L; }
-  let n = 0, si = 0;
-  for (let along = 1.8 + (t * 0.9) % TRAIL_GAP; along < total - 1.6 && n < TRAIL_MAX && segs.length; along += TRAIL_GAP) {
-    while (si < segs.length - 1 && along > segs[si][5] + segs[si][4]) si++;
-    const [ax, az, bx, bz, L, st] = segs[si]; const f = clamp((along - st) / L, 0, 1);
-    const x = ax + (bx - ax) * f, z = az + (bz - az) * f;
-    if (along > TRAIL_LEN) break;
-    const fade = Math.min(1, (along - 1.2) / 2) * Math.min(1, (total - along) / 3) * Math.max(0, 1 - (along - TRAIL_LEN * 0.6) / (TRAIL_LEN * 0.4));
-    const sc = 0.15 + 0.7 * fade;
-    _q.setFromEuler(_e.set(0, Math.atan2(bx - ax, bz - az), 0)); _s.set(sc, 1, sc);
-    _m4.compose(_v.set(x, standY(x, z) + 0.14, z), _q, _s); TRAIL.setMatrixAt(n, _m4);
-    _m4.compose(_v.set(x, standY(x, z) + 0.12, z), _q, _s); TRAIL_O.setMatrixAt(n, _m4);
-    n++;
-  }
+  let n = 0;
+  tgs.forEach((tg, ti) => {
+    const d = Math.hypot(tg.x - p.x, tg.z - p.z), PL = PILLARS[ti];
+    if (PL) {
+      PL.position.set(tg.x, (tg.y !== undefined ? Math.max(tg.y, groundY(tg.x, tg.z)) : groundY(tg.x, tg.z)), tg.z);
+      const pul = 0.5 + 0.5 * Math.sin(t * 3); PL.ring.scale.setScalar(1 + pul * 0.2); PL.ring.material.opacity = 0.35 + 0.25 * (1 - pul); PL.cyl.material.opacity = clamp((d - 6) / 20, 0, 0.45); PL.visible = d > 6;
+    }
+    if (d < 3) return;
+    const P = (NAV.paths && NAV.paths[ti]) || []; if (P.length < 2) return;
+    P[0] = [p.x, p.z];
+    const segs = []; let total = 0;
+    for (let i = 0; i < P.length - 1; i++) { const L = Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]); if (L < 0.01) continue; segs.push([P[i][0], P[i][1], P[i + 1][0], P[i + 1][1], L, total]); total += L; }
+    let si = 0, cnt = 0;
+    for (let along = 1.8 + (t * 0.9) % TRAIL_GAP; along < total - 1.6 && cnt < TRAIL_MAX && segs.length; along += TRAIL_GAP) {
+      while (si < segs.length - 1 && along > segs[si][5] + segs[si][4]) si++;
+      const [ax, az, bx, bz, L, st] = segs[si]; const f = clamp((along - st) / L, 0, 1);
+      const x = ax + (bx - ax) * f, z = az + (bz - az) * f;
+      if (along > TRAIL_LEN) break;
+      const fade = Math.min(1, (along - 1.2) / 2) * Math.min(1, (total - along) / 3) * Math.max(0, 1 - (along - TRAIL_LEN * 0.6) / (TRAIL_LEN * 0.4));
+      const sc = 0.15 + 0.7 * fade;
+      _q.setFromEuler(_e.set(0, Math.atan2(bx - ax, bz - az), 0)); _s.set(sc, 1, sc);
+      _m4.compose(_v.set(x, standY(x, z) + 0.14, z), _q, _s); TRAIL.setMatrixAt(n, _m4);
+      _m4.compose(_v.set(x, standY(x, z) + 0.12, z), _q, _s); TRAIL_O.setMatrixAt(n, _m4);
+      n++; cnt++;
+    }
+  });
   _s.set(1, 1, 1);
   TRAIL.count = TRAIL_O.count = n; TRAIL.instanceMatrix.needsUpdate = true; TRAIL_O.instanceMatrix.needsUpdate = true;
 }
